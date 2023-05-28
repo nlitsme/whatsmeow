@@ -70,6 +70,7 @@ var (
 	_ DownloadableMessage   = (*waProto.VideoMessage)(nil)
 	_ DownloadableMessage   = (*waProto.DocumentMessage)(nil)
 	_ DownloadableMessage   = (*waProto.StickerMessage)(nil)
+	_ DownloadableMessage   = (*waProto.StickerMetadata)(nil)
 	_ DownloadableMessage   = (*waProto.HistorySyncNotification)(nil)
 	_ DownloadableMessage   = (*waProto.ExternalBlobReference)(nil)
 	_ DownloadableThumbnail = (*waProto.ExtendedTextMessage)(nil)
@@ -96,6 +97,7 @@ var classToMediaType = map[protoreflect.Name]MediaType{
 	"VideoMessage":    MediaVideo,
 	"DocumentMessage": MediaDocument,
 	"StickerMessage":  MediaImage,
+	"StickerMetadata": MediaImage,
 
 	"HistorySyncNotification": MediaHistory,
 	"ExternalBlobReference":   MediaAppState,
@@ -190,10 +192,10 @@ func (cli *Client) Download(msg DownloadableMessage) ([]byte, error) {
 	var isWebWhatsappNetURL bool
 	if ok {
 		url = urlable.GetUrl()
-		isWebWhatsappNetURL = strings.HasPrefix(urlable.GetUrl(), "https://web.whatsapp.net")
+		isWebWhatsappNetURL = strings.HasPrefix(url, "https://web.whatsapp.net")
 	}
 	if len(url) > 0 && !isWebWhatsappNetURL {
-		return cli.downloadAndDecrypt(urlable.GetUrl(), msg.GetMediaKey(), mediaType, getSize(msg), msg.GetFileEncSha256(), msg.GetFileSha256())
+		return cli.downloadAndDecrypt(url, msg.GetMediaKey(), mediaType, getSize(msg), msg.GetFileEncSha256(), msg.GetFileSha256())
 	} else if len(msg.GetDirectPath()) > 0 {
 		return cli.DownloadMediaWithPath(msg.GetDirectPath(), msg.GetFileEncSha256(), msg.GetFileSha256(), msg.GetMediaKey(), getSize(msg), mediaType, mediaTypeToMMSType[mediaType])
 	} else {
@@ -266,7 +268,9 @@ func (cli *Client) downloadEncryptedMedia(url string, checksum []byte) (file, ma
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusNotFound {
+		if resp.StatusCode == http.StatusForbidden {
+			err = ErrMediaDownloadFailedWith403
+		} else if resp.StatusCode == http.StatusNotFound {
 			err = ErrMediaDownloadFailedWith404
 		} else if resp.StatusCode == http.StatusGone {
 			err = ErrMediaDownloadFailedWith410

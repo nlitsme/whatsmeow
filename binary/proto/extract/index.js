@@ -8,21 +8,21 @@ const addPrefix = (lines, prefix) => lines.map(line => prefix + line)
 async function findAppModules(mods) {
     const ua = {
         headers: {
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:111.0) Gecko/20100101 Firefox/111.0",
             "Sec-Fetch-Dest": "script",
             "Sec-Fetch-Mode": "no-cors",
             "Sec-Fetch-Site": "same-origin",
             "Referer": "https://web.whatsapp.com/",
-            "Accept": "*/*",
+            "Accept": "*/*", /**/
             "Accept-Language": "Accept-Language: en-US,en;q=0.5",
         }
     }
     const baseURL = "https://web.whatsapp.com"
     const index = await request.get(baseURL, ua)
-    const bootstrapQRID = index.match(/src="\/bootstrap_qr.([0-9a-z]{10,}).js"/)[1]
-    const bootstrapQRURL = baseURL + "/bootstrap_qr." + bootstrapQRID + ".js"
-    console.error("Found bootstrap_qr.js URL:", bootstrapQRURL)
-    const qrData = await request.get(bootstrapQRURL, ua)
+    const appID = index.match(/src="\/app.([0-9a-z]{10,}).js"/)[1]
+    const appURL = baseURL + "/app." + appID + ".js"
+    console.error("Found app.js URL:", appURL)
+    const qrData = await request.get(appURL, ua)
     const waVersion = qrData.match(/appVersion:"(\d\.\d+\.\d+)"/)[1]
     console.log("Current version:", waVersion)
     // This one list of types is so long that it's split into two JavaScript declarations.
@@ -36,22 +36,21 @@ async function findAppModules(mods) {
 (async () => {
     // The module IDs that contain protobuf types
     const wantedModules = [
-        618036, // ADVSignedKeyIndexList, ADVSignedDeviceIdentity, ADVSignedDeviceIdentityHMAC, ADVKeyIndexList, ADVDeviceIdentity
-        395782, // DeviceProps
-        970016, // Message, ..., RequestPaymentMessage, Reaction, QuickReplyButton, ..., ButtonsResponseMessage, ActionLink, ...
-        118494, // EphemeralSetting
-        655919, // WallpaperSettings, Pushname, MediaVisibility, HistorySync, ..., GroupParticipant, ...
-        575637, // PollEncValue, MsgOpaqueData, MsgRowOpaqueData
-        692440, // ServerErrorReceipt, MediaRetryNotification, MediaRetryNotificationResult
-        135923, // MessageKey
-        370910, // Duplicate of MessageKey
-        550073, // SyncdVersion, SyncdValue, ..., SyncdPatch, SyncdMutation, ..., ExitCode
-        381,   // SyncActionValue, ..., UnarchiveChatsSetting, SyncActionData, StarAction, ...
-        482593, // VerifiedNameCertificate, LocalizedName, ..., BizIdentityInfo, BizAccountLinkInfo, ...
-        92776, // HandshakeMessage, ..., ClientPayload, ..., AppVersion, UserAgent, WebdPayload ...
-        // 275511, // seems to be same as above
-        956262, // Reaction, UserReceipt, ..., PhotoChange, ..., WebFeatures, ..., WebMessageInfoStatus, ...
-        819601, // NoiseCertificate, CertChain
+        962559, // ADVSignedKeyIndexList, ADVSignedDeviceIdentity, ADVSignedDeviceIdentityHMAC, ADVKeyIndexList, ADVDeviceIdentity
+        113259, // DeviceProps
+        533494, // Message, ..., RequestPaymentMessage, Reaction, QuickReplyButton, ..., ButtonsResponseMessage, ActionLink, ...
+        199931, // EphemeralSetting
+        60370, // WallpaperSettings, Pushname, MediaVisibility, HistorySync, ..., GroupParticipant, ...
+        412744, // PollEncValue, MsgOpaqueData, MsgRowOpaqueData
+        229479, // ServerErrorReceipt, MediaRetryNotification, MediaRetryNotificationResult
+        933734, // MessageKey
+        150715, // Duplicate of MessageKey
+        984084, // SyncdVersion, SyncdValue, ..., SyncdPatch, SyncdMutation, ..., ExitCode
+        517244, // SyncActionValue, ..., UnarchiveChatsSetting, SyncActionData, StarAction, ...
+        759089, // VerifiedNameCertificate, LocalizedName, ..., BizIdentityInfo, BizAccountLinkInfo, ...
+        614806, // HandshakeMessage, ..., ClientPayload, ..., AppVersion, UserAgent, WebdPayload ...
+        968923, // Reaction, UserReceipt, ..., PhotoChange, ..., WebFeatures, ..., WebMessageInfoStatus, ...
+        698723, // NoiseCertificate, CertChain
     ]
     const unspecName = name => name.endsWith("Spec") ? name.slice(0, -4) : name
     const unnestName = name => name.replace("Message$", "").replace("SyncActionValue$", "") // Don't nest messages into Message, that's too much nesting
@@ -223,19 +222,26 @@ async function findAppModules(mods) {
 
 
     for (const mod of modules) {
+        let hasMore = true
+        let loops = 0
         const idents = modulesInfo[mod.key.value].identifiers
-        for (const ident of Object.values(idents)) {
-            if (!ident.name.includes("$")) {
-                continue
+        while (hasMore && loops < 5) {
+            hasMore = false
+            loops++
+            for (const ident of Object.values(idents)) {
+                if (!ident.name.includes("$")) {
+                    continue
+                }
+                const parts = ident.name.split("$")
+                const parent = findNested(Object.values(idents), parts.slice(0, -1))
+                if (!parent) {
+                    hasMore = true
+                    continue
+                }
+                parent.children.push(ident)
+                delete idents[ident.name]
+                ident.unnestedName = parts[parts.length-1]
             }
-            const parts = ident.name.split("$")
-            const parent = findNested(Object.values(idents), parts.slice(0, -1))
-            if (!parent) {
-                continue
-            }
-            parent.children.push(ident)
-            delete idents[ident.name]
-            ident.unnestedName = parts[parts.length-1]
         }
     }
 
