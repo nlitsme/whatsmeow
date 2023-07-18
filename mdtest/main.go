@@ -214,6 +214,16 @@ func handleCmd(cmd string, args []string) {
 	case "help":
         usage()
 
+	case "pair-phone":
+		if len(args) < 1 {
+			log.Errorf("Usage: pair-phone <number>")
+			return
+		}
+		linkingCode, err := cli.PairPhone(args[0], true, whatsmeow.PairClientUnknown, "whatsmeow")
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Linking code:", linkingCode)
 	case "reconnect":
 		cli.Disconnect()
 		err := cli.Connect()
