@@ -1022,7 +1022,7 @@ type InviteGroupSpec struct {
 	Members []types.JID      //  members - max 256
 }
 func CreateInviteGroup(spec InviteGroupSpec) {
-	grp, err := cli.CreateGroup(spec.Name, spec.Members, /*msgid*/"")
+	grp, err := cli.CreateGroup(whatsmeow.ReqCreateGroup{Name: spec.Name, Participants: spec.Members, CreateKey:""})
 	if err!=nil {
 		log.Errorf("error creating group: %v", err)
 		return
@@ -1053,7 +1053,7 @@ func SendInvite(grp *types.GroupInfo, inv types.GroupInvitee, invmsg string) {
 			Caption: proto.String(invmsg),
 		},
 	}
-	ts, err := cli.SendMessage(context.Background(), inv.JID, /*msgid*/"", msg)
+	ts, err := cli.SendMessage(context.Background(), inv.JID, msg, whatsmeow.SendRequestExtra{ID:""})
 	if err != nil {
 		log.Errorf("Error sending invite: %v", err)
 	} else {
